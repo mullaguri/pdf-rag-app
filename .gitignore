@@ -1,1 +1,14 @@
+# Node.js
 node_modules
+.DS_Store
+rago-ui/dist
+rago-ui/.next
+
+# Python
+__pycache__/
+*.py[co]
+.venv/
+
+# Service-specific ignores
+rag-pdf-service/.env
+rag-pdf-service/app.db

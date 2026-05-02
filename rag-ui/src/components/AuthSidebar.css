@@ -1,0 +1,138 @@
+.auth-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 320px;
+  height: 100vh;
+  background: var(--bg1);
+  border-left: 1px solid var(--border);
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-sidebar.open {
+  transform: translateX(0);
+}
+
+.auth-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.auth-sidebar-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text1);
+  margin: 0;
+}
+
+.auth-form {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text1);
+}
+
+.auth-form input {
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  background: var(--bg2);
+  color: var(--text1);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.auth-form input:focus {
+  border-color: var(--blue);
+}
+
+.auth-form select {
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  background: var(--bg2);
+  color: var(--text1);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.auth-form select:focus {
+  border-color: var(--blue);
+}
+
+.auth-hint {
+  font-size: 13px;
+  color: var(--text2);
+  margin: 0 0 8px 0;
+}
+
+.forgot-link {
+  background: none;
+  border: none;
+  color: var(--blue);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+  width: 100%;
+  padding: 8px;
+}
+
+.forgot-link:hover {
+  text-decoration: underline;
+}
+
+.auth-error {
+  padding: 10px;
+  background: var(--red-bg);
+  border: 1px solid rgba(224,85,85,0.3);
+  border-radius: 6px;
+  color: var(--red);
+  font-size: 13px;
+}
+
+.auth-btn {
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--blue);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.auth-btn:hover {
+  background: #0069d9;
+}
+
+.auth-btn:disabled {
+  background: var(--text3);
+  cursor: not-allowed;
+}
+
+.auth-switch {
+  padding: 20px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text2);
+  border-top: 1px solid var(--border);
+}

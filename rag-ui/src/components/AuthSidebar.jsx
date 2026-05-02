@@ -11,7 +11,6 @@ export default function AuthSidebar({ open, onClose, onLogin, onRegister, onForg
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [role, setRole] = useState('student');
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -28,7 +27,6 @@ export default function AuthSidebar({ open, onClose, onLogin, onRegister, onForg
       username,
       email,
       password,
-      role,
       first_name: firstName,
       last_name: lastName
     });
@@ -117,14 +115,7 @@ export default function AuthSidebar({ open, onClose, onLogin, onRegister, onForg
             Last Name *
             <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} required />
           </label>
-          <label>
-            Role *
-            <select value={role} onChange={e => setRole(e.target.value)}>
-              <option value="student">Student</option>
-              <option value="librarian">Librarian</option>
-              <option value="admin">Admin</option>
-            </select>
-          </label>
+
           <label>
             Password *
             <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />

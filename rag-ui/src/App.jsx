@@ -1,14 +1,17 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { DropZone } from './components/DropZone';
+import { DocumentList } from './components/DocumentList';
 import { FileCard } from './components/FileCard';
 import { ChatMessage, TypingIndicator } from './components/ChatMessage';
 import AuthSidebar from './components/AuthSidebar';
 import UserDetails from './components/UserDetails';
 import { useHealth } from './hooks/useHealth';
 import { useChat } from './hooks/useChat';
+import { DocumentModal } from './components/DocumentModal';
 import { useUpload } from './hooks/useUpload';
 import { useAuth } from './hooks/useAuth';
+import { api } from './services/api';
 import './App.css';
 
 export default function App() {
@@ -19,8 +22,26 @@ export default function App() {
           selectedProvider, setSelectedProvider,
           selectedModel, setSelectedModel, currentModels,
           modelParams, updateModelParam, resetModelParams } = useChat();
+
+  const [documents, setDocuments] = useState([]);
+
+  const fetchDocuments = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const data = await api.getDocuments();
+      setDocuments(data.documents);
+    } catch (error) {
+      console.error('Failed to fetch documents:', error);
+    }
+  }, [isAuthenticated]);
+
+  const onUploadSuccess = useCallback(() => {
+    refresh();
+    fetchDocuments();
+  }, [refresh, fetchDocuments]);
+
   const { files, addFiles, removeFile, uploadAll,
-          clearDone, hasPending, isUploading } = useUpload(refresh);
+          clearDone, hasPending, isUploading } = useUpload(onUploadSuccess);
 
   const [input, setInput] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -28,6 +49,7 @@ export default function App() {
   const [authSidebarOpen, setAuthSidebarOpen] = useState(!isAuthenticated);
   const [userDetailsOpen, setUserDetailsOpen] = useState(false);
   const [isDarkTheme, setIsDarkTheme] = useState(true);
+  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
 
   const bottomRef = useRef();
   const textareaRef = useRef();
@@ -39,8 +61,10 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated) {
       setAuthSidebarOpen(true);
+    } else {
+      fetchDocuments();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, fetchDocuments]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -90,14 +114,8 @@ export default function App() {
             <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M21 18H3v-2h18v2Zm0-5H3v-2h18v2Zm0-5H3V6h18v2Z"></path></svg>
           </button>
           <h1 className="app-title">PDF RAG Application</h1>
-          {isAuthenticated && user && (
-            <div className="user-info">
-              <span>Welcome <strong>{formatName(user.first_name)} {formatName(user.last_name)}</strong></span>
-            </div>
-          )}
-          <div className={`server-status ${isAuthenticated ? 'online' : 'offline'}`}>
-            <span className="status-indicator" title={`Server is ${isAuthenticated ? 'online' : 'offline'}`}></span>
-          </div>
+
+
         </div>
         <div className="header-right">
           {isAuthenticated && user ? (
@@ -155,6 +173,7 @@ export default function App() {
               <span>PDF Upload</span>
             </div>
           </div>
+
           <div className="sidebar-body">
             <DropZone onFiles={addFiles} />
             {files.length > 0 && (
@@ -181,13 +200,27 @@ export default function App() {
                 </>
               )}
             </button>
+            <div className="ingested-docs-link">
+              <button className="link-btn" onClick={() => setIsDocModalOpen(true)}>Show ingested documents</button>
+            </div>
           </div>
         </aside>
 
         {/* Main Chat Area */}
         <main className="chat-main">
           <header className="chat-header">
-            <div className="chat-header-left"></div>
+            <div className="chat-header-left">
+              {isAuthenticated && user && (
+                <>
+                  <div className="user-info">
+                    <span>Welcome <strong>{formatName(user.first_name)} {formatName(user.last_name)}</strong></span>
+                  </div>
+                  <div className={`server-status ${isAuthenticated ? 'online' : 'offline'}`}>
+                    <span className="status-indicator" title={`Server is ${isAuthenticated ? 'online' : 'offline'}`}></span>
+                  </div>
+                </>
+              )}
+            </div>
             <div className="chat-header-right">
               {messages.length > 0 && (
                 <button className="icon-btn" onClick={clearMessages} title="Clear chat">
@@ -362,11 +395,15 @@ export default function App() {
               />
               <span className="param-hint">Integer for reproducibility</span>
             </div>
+          </div>
+          <div className="params-panel-footer">
             <button className="reset-params-btn" onClick={resetModelParams}>
               Reset to Defaults
             </button>
           </div>
         </aside>
-      </div>    </div>
+      </div>
+      {isDocModalOpen && <DocumentModal documents={documents} onClose={() => setIsDocModalOpen(false)} />}
+    </div>
   );
 }

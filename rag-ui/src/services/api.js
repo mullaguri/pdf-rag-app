@@ -140,9 +140,6 @@ export const api = {
       const xhr = new XMLHttpRequest();
       const form = new FormData();
       form.append('file', file);
-      const token = getAccessToken();
-      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable && onProgress) {
           onProgress(Math.round((e.loaded / e.total) * 100));
@@ -162,6 +159,8 @@ export const api = {
 
       xhr.addEventListener('error', () => reject(new Error('Network error')));
       xhr.open('POST', `${BASE_URL}/ingest/pdf`);
+      const token = getAccessToken();
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       xhr.send(form);
     });
   },
@@ -191,6 +190,24 @@ export const api = {
   async getModels() {
     const res = await fetchWithAuth(`${BASE_URL}/rag/models`);
     if (!res.ok) throw new Error('Failed to fetch models');
+    return res.json();
+  },
+
+  async getDocuments() {
+    const res = await fetchWithAuth(`${BASE_URL}/ingest/documents`);
+    if (!res.ok) throw new Error('Failed to fetch documents');
+    return res.json();
+  },
+
+  async cleanupExpiredTokens() {
+    const res = await fetchWithAuth(`${BASE_URL}/auth/cleanup-expired-tokens`, { method: 'POST' });
+    if (!res.ok) throw new Error('Failed to cleanup expired tokens');
+    return res.json();
+  },
+
+  async resetVectorStore() {
+    const res = await fetchWithAuth(`${BASE_URL}/ingest/vector-store`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to reset vector store');
     return res.json();
   },
 };

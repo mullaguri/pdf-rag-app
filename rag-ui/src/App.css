@@ -164,10 +164,45 @@ body {
 
 .main-content {
   flex: 1;
-  display: grid;
-  grid-template-columns: var(--sidebar-width) 1fr var(--params-panel-width);
+  display: flex;
   overflow: hidden;
-  transition: grid-template-columns 0.3s ease;
+}
+
+.sidebar,
+.params-panel {
+  flex-shrink: 0;
+  transition: width 0.3s ease;
+}
+
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--bg1);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar.closed {
+  width: 0;
+  overflow: hidden;
+}
+
+.chat-main {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Prevent chat-main from scrolling */
+  background: var(--bg1);
+}
+
+.chat-messages {
+  flex-grow: 1;
+  overflow-y: auto; /* Enable scrolling for messages */
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .user-info {
@@ -209,30 +244,17 @@ body {
 .server-status.offline .status-indicator { background: var(--red); }
 
 /* ── Sidebar ───────────────────────────────────────────────────── */
-.sidebar {
-  background: var(--bg1);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto; /* Allow scrolling for content */
-  width: var(--sidebar-width); /* Use CSS variable for width */
-  transition: width 0.3s ease; /* Transition width */
-  grid-column: 1; /* Position in first column of grid */
-.sidebar.closed {
-  width: 0 !important;
-  overflow: hidden;
-}/* Hide content overflow */
-}
-
-
-
 /* ── Sidebar Header ────────────────────────────────────────────── */
-.sidebar-header {
-  padding: 20px;
+.sidebar-header,
+.chat-header,
+.params-panel-header {
+  padding: 16px 20px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  height: 60px;
+  flex-shrink: 0;
 }
 
 .sidebar-logo {
@@ -399,12 +421,18 @@ body {
 }
 
 /* ── Sidebar Footer ────────────────────────────────────────────── */
-.sidebar-footer {
+.sidebar-footer,
+.params-panel-footer,
+.chat-input-area {
   padding: 20px;
   border-top: 1px solid var(--border);
+  background: var(--bg1);
+  flex-shrink: 0;
+  min-height: 155px;
 }
 
 .upload-btn {
+  margin-top: 2.5px;
   width: 100%;
   padding: 12px 16px;
   background: var(--blue);
@@ -446,21 +474,7 @@ body {
 }
 
 /* ── Chat Main ─────────────────────────────────────────────────── */
-.chat-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg1);
-}
 
-/* ── Chat Header ───────────────────────────────────────────────── */
-.chat-header {
-  padding: 20px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
 
 .chat-header-left h1 {
   font-size: 24px;
@@ -472,6 +486,12 @@ body {
 .chat-sub {
   font-size: 14px;
   color: var(--text2);
+}
+
+.chat-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .chat-header-right {
@@ -521,14 +541,6 @@ body {
 }
 
 /* ── Chat Messages ─────────────────────────────────────────────── */
-.chat-messages {
-  flex: 1;
-  padding: 20px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
 
 /* ── Empty Chat ────────────────────────────────────────────────── */
 .empty-chat {
@@ -699,11 +711,7 @@ body {
 }
 
 /* ── Chat Input Area ───────────────────────────────────────────── */
-.chat-input-area {
-  padding: 20px;
-  border-top: 1px solid var(--border);
-  background: var(--bg1);
-}
+
 
 .input-box {
   display: flex;
@@ -877,13 +885,7 @@ body {
 }/* Hide content overflow */
 }
 
-.params-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-}
+
 
 .params-panel-header h3 {
   font-size: 16px;
@@ -893,6 +895,7 @@ body {
 }
 
 .params-panel-body {
+  flex: 1;
   padding: 20px;
   overflow-y: auto;
 }

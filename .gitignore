@@ -10,5 +10,4 @@ __pycache__/
 .venv/
 
 # Service-specific ignores
-rag-pdf-service/.env
 rag-pdf-service/app.db

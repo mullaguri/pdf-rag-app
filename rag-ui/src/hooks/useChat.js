@@ -10,7 +10,7 @@ const DEFAULT_MODEL_PARAMS = {
   seed: null,
 };
 
-export function useChat() {
+export function useChat(isAuthenticated) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [evaluate, setEvaluate] = useState(true);   // ✅ toggle state
@@ -22,27 +22,29 @@ export function useChat() {
 
   // ✅ Fetch available models on mount
   useEffect(() => {
-    api.getModels()
-      .then(data => {
-        const providerList = data.providers || [];
-        const modelsMap = data.models || {};
-        setProviders(providerList);
-        setModelsByProvider(modelsMap);
-        
-        // Auto-select first provider and its default model
-        if (providerList.length > 0) {
-          const firstProvider = providerList[0];
-          setSelectedProvider(firstProvider);
+    if (isAuthenticated) {
+      api.getModels()
+        .then(data => {
+          const providerList = data.providers || [];
+          const modelsMap = data.models || {};
+          setProviders(providerList);
+          setModelsByProvider(modelsMap);
           
-          const providerModels = modelsMap[firstProvider] || [];
-          const defaultModel = providerModels.find(m => m.is_default) || providerModels[0];
-          if (defaultModel) {
-            setSelectedModel(defaultModel.model);
+          // Auto-select first provider and its default model
+          if (providerList.length > 0) {
+            const firstProvider = providerList[0];
+            setSelectedProvider(firstProvider);
+            
+            const providerModels = modelsMap[firstProvider] || [];
+            const defaultModel = providerModels.find(m => m.is_default) || providerModels[0];
+            if (defaultModel) {
+              setSelectedModel(defaultModel.model);
+            }
           }
-        }
-      })
-      .catch(err => console.warn('Failed to fetch models:', err));
-  }, []);
+        })
+        .catch(err => console.warn('Failed to fetch models:', err));
+    }
+  }, [isAuthenticated]);
 
   // ✅ Handle provider change - reset model selection
   const handleProviderChange = useCallback((provider) => {

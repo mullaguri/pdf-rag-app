@@ -21,7 +21,7 @@ export default function App() {
           evaluate, setEvaluate, providers, modelsByProvider,
           selectedProvider, setSelectedProvider,
           selectedModel, setSelectedModel, currentModels,
-          modelParams, updateModelParam, resetModelParams } = useChat();
+          modelParams, updateModelParam, resetModelParams } = useChat(isAuthenticated);
 
   const [documents, setDocuments] = useState([]);
 
@@ -59,9 +59,8 @@ export default function App() {
   }, [isDarkTheme]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      setAuthSidebarOpen(true);
-    } else {
+    if (isAuthenticated) {
+      setAuthSidebarOpen(false);
       fetchDocuments();
     }
   }, [isAuthenticated, fetchDocuments]);

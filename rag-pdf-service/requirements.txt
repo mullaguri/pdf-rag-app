@@ -34,3 +34,9 @@ python-jose[cryptography]
 pydantic-settings
 langsmith
 
+# For OCR with pytesseract
+pytesseract
+pdf2image
+Pillow
+
+

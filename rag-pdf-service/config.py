@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int
     ACCESS_TOKEN_EXPIRE_MINUTES: int
     SQLALCHEMY_DATABASE_URL: str
+    TESSERACT_PATH: Optional[str] = None    # Path to tesseract executable
 
 
     class Config:

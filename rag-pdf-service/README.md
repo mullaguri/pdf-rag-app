@@ -22,3 +22,25 @@ uv run uvicorn main:app --reload
 
 Get-ChildItem -Path . -Include __pycache__ -Recurse -Directory | Remove-Item -Recurse -Force; 
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+
+
+# On macOS
+brew install tesseract
+brew install poppler
+
+# On Debian/Ubuntu
+sudo apt-get install tesseract-ocr
+sudo apt-get install poppler-utils
+
+If `pytesseract` still can't find your Tesseract installation, you can specify the path in your `.env` file:
+
+```
+TESSERACT_PATH=/path/to/your/tesseract
+```
+
+For example, on macOS with Homebrew on Apple Silicon, this would be:
+`TESSERACT_PATH=/opt/homebrew/bin/tesseract`
+
+On an Intel Mac with Homebrew, it would be:
+`TESSERACT_PATH=/usr/local/bin/tesseract`

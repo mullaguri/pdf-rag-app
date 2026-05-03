@@ -11,3 +11,4 @@ __pycache__/
 
 # Service-specific ignores
 rag-pdf-service/app.db
+rag-pdf-service/.env

@@ -25,8 +25,11 @@ def save_vectorstore(vectorstore: FAISS):
     os.makedirs(os.path.dirname(VECTOR_STORE_PATH), exist_ok=True)
     vectorstore.save_local(VECTOR_STORE_PATH)
 
-def add_documents_to_vectorstore(docs: list) -> FAISS:
+def add_documents_to_vectorstore(docs: list):
     """Add new documents to existing or new FAISS index."""
+    if not docs:
+        return
+
     existing = get_vectorstore()
     if existing:
         existing.add_documents(docs)

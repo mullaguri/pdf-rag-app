@@ -14,9 +14,9 @@ services:
       - VECTOR_STORE_PATH=/app/vectorstore/faiss_index
     volumes:
       # Hot reload: mirror local code into container
-      - .:/app
+      - .:/app:ro
       # Persist FAISS index across container restarts
-      - faiss_data:/app/vectorstore/faiss_index
+      - faiss_data:/app/vectorstore
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/rag/health"]

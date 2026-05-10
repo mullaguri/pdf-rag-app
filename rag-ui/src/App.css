@@ -686,6 +686,17 @@ body {
   30% { opacity: 1; }
 }
 
+/* ── Streaming Indicator ────────────────────────────────────────── */
+.streaming-indicator {
+  display: inline-block;
+}
+
+@keyframes blink {
+  0%, 20%, 50%, 80%, 100% { opacity: 1; }
+  40% { opacity: 0.3; }
+  60% { opacity: 0.3; }
+}
+
 /* ── Source Row ────────────────────────────────────────────────── */
 .source-row {
   margin-top: 8px;

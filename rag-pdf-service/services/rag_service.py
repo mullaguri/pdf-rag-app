@@ -1,4 +1,5 @@
 import os
+import asyncio
 from typing import Optional, Any
 from langsmith import traceable
 from langchain_groq import ChatGroq
@@ -396,3 +397,103 @@ def get_rag_answer(
         }
 
     return result    
+
+
+async def get_rag_answer_stream(
+    question: str,
+    evaluate: bool = True,
+    model_name: Optional[str] = None,
+    model_params: Optional[ModelParams] = None
+):
+    """
+    Async generator that streams RAG answer chunks in real-time.
+    Yields JSON-serializable dictionaries with streaming data.
+    
+    Yields:
+        dict: Event data with type and content
+              - {"type": "start"} - Stream started
+              - {"type": "chunk", "content": "..."} - Answer chunk
+              - {"type": "sources", "sources": [...]} - Source documents
+              - {"type": "evaluation", "evaluation": {...}} - Evaluation result
+              - {"type": "end"} - Stream ended
+              - {"type": "error", "error": "..."} - Error occurred
+    """
+    try:
+        vectorstore = get_vectorstore()
+        if not vectorstore:
+            raise ValueError("Vector store is empty. Please ingest PDFs first.")
+
+        # Signal stream start
+        yield {"type": "start", "message": "Starting RAG query..."}
+
+        # Detect if user is asking for all documents
+        is_all_docs = is_all_documents_query(question)
+        
+        # Retrieve documents based on query type
+        if is_all_docs:
+            docs = retrieve_from_all_documents(vectorstore, question)
+        else:
+            retriever = vectorstore.as_retriever(
+                search_type="mmr",
+                search_kwargs={
+                    "k": 8,
+                    "fetch_k": 16,
+                    "lambda_mult": 0.7
+                }
+            )
+            docs = retriever.invoke(question)
+
+        # Yield sources
+        sources = list({doc.metadata.get("source", "unknown") for doc in docs})
+        yield {"type": "sources", "sources": sources}
+
+        # Format context from retrieved documents
+        context = format_docs(docs)
+        
+        # Get LLM and create chain
+        llm = get_llm(model_name, model_params)
+        
+        # Create a streaming chain
+        chain = (
+            RAG_PROMPT
+            | llm
+            | StrOutputParser()
+        )
+
+        # Stream the response
+        yield {"type": "message", "message": "Generating response..."}
+        
+        # Use asyncio to run the chain in a thread pool to avoid blocking
+        answer_chunks = []
+        
+        # LangChain supports streaming via .stream()
+        for chunk in chain.stream({"context": context, "question": question}):
+            yield {"type": "chunk", "content": chunk}
+            answer_chunks.append(chunk)
+
+        # Combine all chunks to get the full answer for evaluation
+        full_answer = "".join(answer_chunks)
+
+        # Evaluate if requested
+        if evaluate:
+            yield {"type": "message", "message": "Evaluating response..."}
+            eval_result = evaluate_response(
+                question=question,
+                reference=context,
+                answer=full_answer,
+            )
+            yield {
+                "type": "evaluation",
+                "evaluation": {
+                    "verdict": eval_result["verdict"],
+                    "is_correct": eval_result["is_correct"],
+                }
+            }
+
+        # Signal completion
+        yield {"type": "end", "message": "Stream complete"}
+
+    except ValueError as e:
+        yield {"type": "error", "error": str(e)}
+    except Exception as e:
+        yield {"type": "error", "error": f"LLM error: {str(e)}"}

@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 from typing import Optional, List
-from services.rag_service import get_rag_answer, SUPPORTED_MODELS, ModelParams
+import json
+from services.rag_service import get_rag_answer, get_rag_answer_stream, SUPPORTED_MODELS, ModelParams
 from .auth import get_current_user
 
 
@@ -61,6 +63,45 @@ async def ask_question(payload: QuestionRequest):
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM error: {str(e)}")
+
+
+@router.post("/ask-stream", summary="Ask a question with streaming response")
+async def ask_question_stream(payload: QuestionRequest):
+    """Stream the RAG response in real-time using Server-Sent Events."""
+    if not payload.question.strip():
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
+    
+    # Convert request params to ModelParams if provided
+    model_params = None
+    if payload.model_params:
+        model_params = ModelParams(
+            temperature=payload.model_params.temperature,
+            top_p=payload.model_params.top_p,
+            top_k=payload.model_params.top_k,
+            max_tokens=payload.model_params.max_tokens,
+            frequency_penalty=payload.model_params.frequency_penalty,
+            presence_penalty=payload.model_params.presence_penalty,
+            stop=payload.model_params.stop,
+            seed=payload.model_params.seed,
+            timeout=payload.model_params.timeout,
+        )
+    
+    async def event_generator():
+        try:
+            # Stream the answer chunks
+            async for chunk in get_rag_answer_stream(
+                question=payload.question,
+                evaluate=payload.evaluate,
+                model_name=payload.model_name,
+                model_params=model_params
+            ):
+                yield f"data: {json.dumps(chunk)}\n\n"
+        except ValueError as e:
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'error': f'LLM error: {str(e)}'})}\n\n"
+    
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @router.get("/models", summary="List all supported LLM models")

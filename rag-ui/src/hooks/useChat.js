@@ -75,19 +75,73 @@ export function useChat(isAuthenticated) {
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
 
+    // Create assistant message placeholder
+    const assistantId = Date.now() + 1;
+    setMessages(prev => [...prev, {
+      id:         assistantId,
+      role:       'assistant',
+      text:       '',
+      sources:    [],
+      evaluation: null,
+      evaluate:   evaluate,
+      isStreaming: true
+    }]);
+
     try {
-      const data = await api.askQuestion(question, evaluate, selectedModel, modelParams);  // ✅ pass modelParams
-      setMessages(prev => [...prev, {
-        id:         Date.now() + 1,
-        role:       'assistant',
-        text:       data.answer,
-        sources:    data.sources || [],
-        evaluation: data.evaluation || null,          // ✅ store eval result
-        evaluate:   evaluate,                          // ✅ store whether eval was enabled
-      }]);
+      let fullText = '';
+      let sources = [];
+      let evaluation = null;
+
+      // Use streaming API
+      const streamGenerator = api.askQuestionStream(question, evaluate, selectedModel, modelParams);
+      
+      for await (const event of streamGenerator) {
+        if (event.type === 'chunk') {
+          // Append chunk to message text
+          fullText += event.content;
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === assistantId 
+                ? { ...msg, text: fullText }
+                : msg
+            )
+          );
+        } else if (event.type === 'sources') {
+          sources = event.sources;
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === assistantId 
+                ? { ...msg, sources }
+                : msg
+            )
+          );
+        } else if (event.type === 'evaluation') {
+          evaluation = event.evaluation;
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === assistantId 
+                ? { ...msg, evaluation, isStreaming: false }
+                : msg
+            )
+          );
+        } else if (event.type === 'error') {
+          throw new Error(event.error);
+        } else if (event.type === 'end') {
+          // Stream ended
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === assistantId 
+                ? { ...msg, isStreaming: false }
+                : msg
+            )
+          );
+        }
+      }
     } catch (err) {
+      // Remove the placeholder message and add error message
+      setMessages(prev => prev.filter(msg => msg.id !== assistantId));
       setMessages(prev => [...prev, {
-        id:   Date.now() + 1,
+        id:   Date.now() + 2,
         role: 'error',
         text: err.message || 'Something went wrong.',
       }]);

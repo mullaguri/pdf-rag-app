@@ -10,6 +10,12 @@ export function ChatMessage({ message }) {
       <div className="chat-bubble-wrap">
         <div className={`chat-bubble ${isError ? 'bubble-error' : ''}`}>
           {message.text}
+          {/* ✅ Show streaming indicator */}
+          {message.isStreaming && (
+            <span className="streaming-indicator" style={{ marginLeft: '4px' }}>
+              <span style={{ display: 'inline-block', animation: 'blink 1.4s infinite' }}>●</span>
+            </span>
+          )}
         </div>
 
         {/* ✅ Sources + Eval verdict on same row */}

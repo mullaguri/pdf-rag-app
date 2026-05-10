@@ -170,7 +170,7 @@ export const api = {
     const payload = { 
       question, 
       evaluate, 
-      ...(model && { model }),
+      ...(model && { model_name: model }),
       ...(modelParams && Object.keys(modelParams).length > 0 && { model_params: modelParams })
     };
     console.log('📤 Sending to /rag/ask:', payload);
@@ -184,6 +184,61 @@ export const api = {
       throw new Error(err.detail || 'Failed to get answer');
     }
     return res.json();
+  },
+
+  // ✅ NEW: Stream RAG answer
+  async *askQuestionStream(question, evaluate = true, model = null, modelParams = null) {
+    const payload = { 
+      question, 
+      evaluate, 
+      ...(model && { model_name: model }),
+      ...(modelParams && Object.keys(modelParams).length > 0 && { model_params: modelParams })
+    };
+    console.log('📤 Streaming to /rag/ask-stream:', payload);
+    
+    const token = getAccessToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${BASE_URL}/rag/ask-stream`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to stream answer');
+    }
+
+    // Handle Server-Sent Events stream
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              yield data;
+            } catch (e) {
+              console.error('Failed to parse SSE data:', e);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
   },
 
   // ✅ Get available LLM models

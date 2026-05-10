@@ -1,5 +1,6 @@
 from database import Base
-from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
+from sqlalchemy import ForeignKey
 
 
 class User(Base):
@@ -51,6 +52,21 @@ class Document(Base):
     chunk_count = Column(Integer)
     uploaded_at = Column(DateTime)
     size_bytes = Column(Integer)
+    created_at = Column(DateTime)
+    updated_at = Column(DateTime)
+    created_by = Column(String)
+    updated_by = Column(String)
+
+
+class ConversationHistory(Base):
+    __tablename__ = "conversation_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    question = Column(Text, nullable=False)
+    answer = Column(Text, nullable=False)
+    sources = Column(Text)  # JSON string of sources
+    session_id = Column(String, index=True)  # Optional session identifier
     created_at = Column(DateTime)
     updated_at = Column(DateTime)
     created_by = Column(String)

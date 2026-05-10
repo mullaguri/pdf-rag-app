@@ -1,14 +1,16 @@
 import os
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from dotenv import load_dotenv
+from .pinecone_store import EmbeddingProvider
 
 load_dotenv()
 
 VECTOR_STORE_PATH = os.getenv("VECTOR_STORE_PATH", "./vectorstore/faiss_index")
 EMBEDDING_MODEL   = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 
-embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+# Use EmbeddingProvider for proper provider detection
+embedding_provider = EmbeddingProvider(EMBEDDING_MODEL)
+embeddings = embedding_provider.embeddings
 
 def get_vectorstore() -> FAISS:
     """Load existing FAISS index or return None if not found."""

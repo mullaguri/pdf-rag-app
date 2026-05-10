@@ -8,10 +8,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 @traceable(run_type="chain")
-def evaluate_response(question: str, reference: str, answer: str) -> dict:
+def evaluate_response(question: str, reference: str, answer: str, history_context: str = "") -> dict:
     """
     Uses a separate LLM instance as an evaluator/judge.
     Returns verdict: 'correct' or 'incorrect' with confidence details.
+    
+    Args:
+        question: The user's question
+        reference: Document context used for the answer
+        answer: The AI's response
+        history_context: Previous conversation history (if any)
     """
     # ✅ Separate evaluator LLM — can be different model than the main one
     evaluator_llm = ChatGroq(
@@ -23,9 +29,14 @@ def evaluate_response(question: str, reference: str, answer: str) -> dict:
 
     chain = EVAL_PROMPT | evaluator_llm | StrOutputParser()
 
+    # Combine document context with history context for evaluation
+    full_context = reference
+    if history_context:
+        full_context = f"{history_context}\n\nDocument context:\n{reference}"
+
     raw = chain.invoke({
         "question":  question,
-        "reference": reference,
+        "reference": full_context,
         "answer":    answer,
     })
 

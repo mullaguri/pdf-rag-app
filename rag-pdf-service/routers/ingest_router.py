@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
-from services.embedding_service import process_pdf, reset_vector_store, get_all_document_names
+from services.embedding_service import process_pdf, reset_vector_store, get_all_document_names, delete_pinecone_index
 from typing import List
 from .auth import get_current_user, get_current_user_object
 import models
@@ -84,3 +84,11 @@ def reset_datastore():
         return {"message": "Vector store has been reset."}
     else:
         return {"message": "Vector store not found or already empty."}
+
+@router.delete("/pinecone-index", summary="Delete the entire Pinecone index")
+def delete_index():
+    result = delete_pinecone_index()
+    if result["success"]:
+        return {"message": result["message"], "index_name": result["index_name"]}
+    else:
+        return {"message": result["message"]}

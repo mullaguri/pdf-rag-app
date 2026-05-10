@@ -166,12 +166,13 @@ export const api = {
   },
 
   // ✅ evaluate param added
-  async askQuestion(question, evaluate = true, model = null, modelParams = null) {
+  async askQuestion(question, evaluate = true, model = null, modelParams = null, sessionId = null) {
     const payload = { 
       question, 
       evaluate, 
       ...(model && { model_name: model }),
-      ...(modelParams && Object.keys(modelParams).length > 0 && { model_params: modelParams })
+      ...(modelParams && Object.keys(modelParams).length > 0 && { model_params: modelParams }),
+      ...(sessionId && { session_id: sessionId })
     };
     console.log('📤 Sending to /rag/ask:', payload);
     const res = await fetchWithAuth(`${BASE_URL}/rag/ask`, {
@@ -187,12 +188,13 @@ export const api = {
   },
 
   // ✅ NEW: Stream RAG answer
-  async *askQuestionStream(question, evaluate = true, model = null, modelParams = null) {
+  async *askQuestionStream(question, evaluate = true, model = null, modelParams = null, sessionId = null) {
     const payload = { 
       question, 
       evaluate, 
       ...(model && { model_name: model }),
-      ...(modelParams && Object.keys(modelParams).length > 0 && { model_params: modelParams })
+      ...(modelParams && Object.keys(modelParams).length > 0 && { model_params: modelParams }),
+      ...(sessionId && { session_id: sessionId })
     };
     console.log('📤 Streaming to /rag/ask-stream:', payload);
     
@@ -263,6 +265,34 @@ export const api = {
   async resetVectorStore() {
     const res = await fetchWithAuth(`${BASE_URL}/ingest/vector-store`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to reset vector store');
+    return res.json();
+  },
+
+  async deletePineconeIndex() {
+    const res = await fetchWithAuth(`${BASE_URL}/ingest/pinecone-index`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to delete Pinecone index');
+    return res.json();
+  },
+
+  // --- HISTORY MANAGEMENT ---
+  
+  // GET /rag/history - Get conversation history
+  async getHistory(sessionId = null, limit = 10) {
+    const params = new URLSearchParams();
+    if (sessionId) params.append('session_id', sessionId);
+    if (limit !== 10) params.append('limit', limit.toString());
+    
+    const url = `${BASE_URL}/rag/history${params.toString() ? '?' + params.toString() : ''}`;
+    const res = await fetchWithAuth(url);
+    if (!res.ok) throw new Error('Failed to fetch conversation history');
+    return res.json();
+  },
+
+  // DELETE /rag/history - Clear conversation history
+  async clearHistory(sessionId = null) {
+    const params = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
+    const res = await fetchWithAuth(`${BASE_URL}/rag/history${params}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to clear conversation history');
     return res.json();
   },
 };

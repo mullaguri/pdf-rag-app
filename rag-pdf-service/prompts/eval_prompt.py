@@ -2,8 +2,9 @@ from langchain_core.prompts import PromptTemplate
 
 EVAL_PROMPT = PromptTemplate(
     input_variables=["question", "reference", "answer"],
-    template="""You are given a question, an answer and reference text. You must determine whether the \
-given answer correctly answers the question based on the reference text. Here is the data:
+    template="""You are given a question, an answer and reference text. The reference may include \
+previous conversation history followed by document context. You must determine whether the given answer correctly \
+answers the question based on the reference text. Here is the data:
 [BEGIN DATA]
 ************
 [Question]: {question}

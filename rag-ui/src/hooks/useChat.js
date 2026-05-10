@@ -19,6 +19,29 @@ export function useChat(isAuthenticated) {
   const [selectedProvider, setSelectedProvider] = useState('');  // ✅ selected provider
   const [selectedModel, setSelectedModel] = useState('');    // ✅ selected model
   const [modelParams, setModelParams] = useState(DEFAULT_MODEL_PARAMS);  // ✅ model parameters
+  const [currentSessionId, setCurrentSessionId] = useState(() => `session-${Date.now()}`);  // ✅ session management
+
+  // ✅ Load conversation history on authentication
+  const loadConversationHistory = useCallback(async () => {
+    if (!isAuthenticated) return;
+    
+    try {
+      const historyData = await api.getHistory(currentSessionId, 50); // Load up to 50 messages
+      if (historyData.history && historyData.history.length > 0) {
+        // Convert history to message format
+        const historyMessages = [];
+        historyData.history.forEach(conv => {
+          historyMessages.push(
+            { id: conv.id * 1000, role: 'user', text: conv.question },
+            { id: conv.id * 1000 + 1, role: 'assistant', text: conv.answer, sources: conv.sources, evaluation: null }
+          );
+        });
+        setMessages(historyMessages);
+      }
+    } catch (err) {
+      console.warn('Failed to load conversation history:', err);
+    }
+  }, [isAuthenticated, currentSessionId]);
 
   // ✅ Fetch available models on mount
   useEffect(() => {
@@ -43,8 +66,11 @@ export function useChat(isAuthenticated) {
           }
         })
         .catch(err => console.warn('Failed to fetch models:', err));
+      
+      // Load conversation history after authentication
+      loadConversationHistory();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, loadConversationHistory]);
 
   // ✅ Handle provider change - reset model selection
   const handleProviderChange = useCallback((provider) => {
@@ -93,7 +119,7 @@ export function useChat(isAuthenticated) {
       let evaluation = null;
 
       // Use streaming API
-      const streamGenerator = api.askQuestionStream(question, evaluate, selectedModel, modelParams);
+      const streamGenerator = api.askQuestionStream(question, evaluate, selectedModel, modelParams, currentSessionId);
       
       for await (const event of streamGenerator) {
         if (event.type === 'chunk') {
@@ -152,6 +178,29 @@ export function useChat(isAuthenticated) {
 
   const clearMessages = useCallback(() => setMessages([]), []);
 
+  // ✅ Start new session
+  const startNewSession = useCallback(() => {
+    const newSessionId = `session-${Date.now()}`;
+    setCurrentSessionId(newSessionId);
+    setMessages([]); // Clear current messages for new session
+  }, []);
+
+  // ✅ Clear conversation history
+  const clearHistory = useCallback(async (sessionId = null) => {
+    try {
+      const targetSessionId = sessionId || currentSessionId;
+      await api.clearHistory(targetSessionId);
+      
+      if (!sessionId) {
+        // If clearing current session, clear messages
+        setMessages([]);
+      }
+    } catch (err) {
+      console.error('Failed to clear history:', err);
+      throw err;
+    }
+  }, [currentSessionId]);
+
   // ✅ Get models for currently selected provider
   const currentModels = modelsByProvider[selectedProvider] || [];
 
@@ -172,5 +221,9 @@ export function useChat(isAuthenticated) {
     modelParams,
     updateModelParam,
     resetModelParams,
+    currentSessionId,
+    setCurrentSessionId,
+    startNewSession,
+    clearHistory,
   };
 }

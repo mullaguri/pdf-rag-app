@@ -1,5 +1,5 @@
 from database import Base, engine, create_tables
-from models import User, BlacklistedToken, RefreshToken, Document
+from models import User, BlacklistedToken, RefreshToken, Document, ConversationHistory
 import os
 
 DB_FILE = "app.db"

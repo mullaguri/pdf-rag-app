@@ -39,4 +39,10 @@ pytesseract
 pdf2image
 Pillow
 
+# For Pinecone vector store
+pinecone
+
+# For OpenAI embeddings (alternative to HuggingFace)
+openai
+
 

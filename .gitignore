@@ -8,6 +8,8 @@ rago-ui/.next
 __pycache__/
 *.py[co]
 .venv/
+rag-pdf-service/vectorstore/__pycache__/faiss_store.cpython-312.pyc
+rag-pdf-service/vectorstore/__pycache__/faiss_store.cpython-312.pyc
 
 # Service-specific ignores
 rag-pdf-service/app.db

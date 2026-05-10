@@ -1,8 +1,8 @@
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from vectorstore.faiss_store import add_documents_to_vectorstore, get_vectorstore, VECTOR_STORE_PATH
-import tempfile, os, shutil
+from vectorstore.pinecone_store import add_documents_to_vectorstore, get_vectorstore
+import tempfile, os
 from pdf2image import convert_from_bytes
 import pytesseract
 from config import settings
@@ -28,7 +28,7 @@ def _extract_text_from_scanned_pdf(file_bytes: bytes) -> list[Document]:
 def process_pdf(file_bytes: bytes, filename: str) -> dict:
     """
     Save PDF temporarily, load, split into chunks,
-    create embeddings and store in FAISS.
+    create embeddings and store in Pinecone.
     Handles both text-based and scanned PDFs.
     """
     pages = []
@@ -89,23 +89,77 @@ def process_pdf(file_bytes: bytes, filename: str) -> dict:
         os.unlink(tmp_path)  # cleanup temp file
 
 def get_all_document_names() -> list[str]:
-    """Retrieve all unique document names from the vector store."""
-    vectorstore = get_vectorstore()
-    if not vectorstore:
+    """Retrieve all unique document names from the Pinecone vector store."""
+    try:
+        vectorstore = get_vectorstore()
+        if not vectorstore:
+            return []
+        
+        # Query Pinecone index to get all vectors with their metadata
+        try:
+            # Get actual embedding dimension from vector store
+            embedding_dimension = vectorstore.embedding_dimension
+            
+            # Get all vectors from the index (limit to a reasonable number)
+            query_response = vectorstore.index.query(
+                vector=[0] * embedding_dimension,  # Dummy vector with correct dimension
+                top_k=1000,  # Get up to 1000 results
+                include_metadata=True
+            )
+            
+            # Extract unique document names from metadata
+            document_names = set()
+            if query_response.matches:
+                for match in query_response.matches:
+                    metadata = match.metadata or {}
+                    # Look for document name in various metadata fields
+                    doc_name = (
+                        metadata.get("source") or 
+                        metadata.get("filename") or 
+                        metadata.get("document_name") or 
+                        metadata.get("title")
+                    )
+                    if doc_name:
+                        document_names.add(doc_name)
+            
+            return sorted(list(document_names))
+            
+        except Exception as e:
+            print(f"Error retrieving document names: {e}")
+            return []
+    except Exception as e:
+        print(f"Error accessing vector store: {e}")
         return []
-
-    # Access the docstore to get all documents
-    docstore = vectorstore.docstore._dict
-    if not docstore:
-        return []
-
-    # Extract unique source filenames
-    doc_names = set(doc.metadata.get("source") for doc in docstore.values())
-    return sorted(list(doc_names))
 
 def reset_vector_store():
-    """Delete the entire vector store directory."""
-    if os.path.exists(VECTOR_STORE_PATH):
-        shutil.rmtree(VECTOR_STORE_PATH)
+    """Delete all vectors from the Pinecone index."""
+    try:
+        vectorstore = get_vectorstore()
+        if not vectorstore:
+            return False
+        
+        # Delete all vectors from the Pinecone index
+        vectorstore.index.delete(delete_all=True)
+        print("✅ All vectors deleted from the Pinecone index")
         return True
-    return False
+    except Exception as e:
+        print(f"Error resetting vector store: {e}")
+        return False
+
+def delete_pinecone_index():
+    """Delete the entire Pinecone index."""
+    try:
+        vectorstore = get_vectorstore()
+        if not vectorstore:
+            return {"success": False, "message": "Vector store not found"}
+        
+        # Get index name before deletion
+        index_name = vectorstore.index_name
+        
+        # Delete the entire index
+        vectorstore.pinecone.delete_index(index_name)
+        print(f"✅ Pinecone index '{index_name}' deleted successfully")
+        return {"success": True, "index_name": index_name, "message": f"Pinecone index '{index_name}' deleted successfully"}
+    except Exception as e:
+        print(f"Error deleting Pinecone index: {e}")
+        return {"success": False, "message": f"Error deleting Pinecone index: {e}"}

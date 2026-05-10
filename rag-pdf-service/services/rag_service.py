@@ -8,10 +8,11 @@ from langchain_community.chat_models import ChatOllama
 from langchain_huggingface import HuggingFaceEndpoint
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
-from vectorstore.faiss_store import get_vectorstore
+from vectorstore.pinecone_store import get_vectorstore
 from prompts.rag_prompt import RAG_PROMPT
 from dotenv import load_dotenv
 from services.eval_service import evaluate_response
+from services.history_service import get_history_service
 
 
 load_dotenv()
@@ -66,73 +67,32 @@ def get_unique_documents(vectorstore) -> set:
     return unique_sources
 
 
-def retrieve_from_all_documents(vectorstore, question: str) -> list:
+def retrieve_from_all_documents(vectorstore, question: str, user_id: Optional[str] = None, session_id: Optional[str] = None) -> list:
     """
     Retrieve relevant chunks from EACH document separately to ensure representation.
     Guarantees at least some chunks from every document.
     
     Args:
-        vectorstore: FAISS vectorstore instance
+        vectorstore: Pinecone vectorstore instance
         question: The user's question
+        user_id: User ID for filtering
+        session_id: Session ID for filtering
         
     Returns:
         List of all retrieved documents combined from all sources
     """
-    all_docs = []
-    unique_sources = get_unique_documents(vectorstore)
-    
-    if not unique_sources:
-        # Fallback: use standard MMR retrieval if we can't detect sources
-        retriever = vectorstore.as_retriever(
-            search_type="mmr",
-            search_kwargs={"k": 15, "fetch_k": 30, "lambda_mult": 0.5}
+    try:
+        # Use Pinecone's similarity search with user/session filtering
+        results = vectorstore.similarity_search(
+            query=question,
+            k=15,  # Get more results for better coverage
+            user_id=user_id,
+            session_id=session_id
         )
-        return retriever.invoke(question)
-    
-    # Retrieve from each document separately
-    chunks_per_doc = 3  # Get 3 chunks from each document
-    
-    for source in unique_sources:
-        try:
-            # Create retriever for this specific document
-            retriever = vectorstore.as_retriever(
-                search_type="mmr",
-                search_kwargs={
-                    "k": chunks_per_doc,
-                    "fetch_k": chunks_per_doc * 2,
-                    "lambda_mult": 0.6,
-                    "filter": {"source": source}  # Filter by source if supported
-                }
-            )
-            docs = retriever.invoke(question)
-            all_docs.extend(docs)
-        except Exception:
-            # If filtering doesn't work, fall back to retrieving and manually filtering
-            retriever = vectorstore.as_retriever(
-                search_type="mmr",
-                search_kwargs={
-                    "k": chunks_per_doc * len(unique_sources),
-                    "fetch_k": chunks_per_doc * len(unique_sources) * 2,
-                    "lambda_mult": 0.6
-                }
-            )
-            docs = retriever.invoke(question)
-            # Manually filter by source
-            for doc in docs:
-                if doc.metadata.get("source") == source and len([d for d in all_docs if d.metadata.get("source") == source]) < chunks_per_doc:
-                    all_docs.append(doc)
-            if len(all_docs) >= chunks_per_doc * len(unique_sources):
-                break
-    
-    # If we didn't get enough docs, do a general retrieval
-    if not all_docs:
-        retriever = vectorstore.as_retriever(
-            search_type="mmr",
-            search_kwargs={"k": 15, "fetch_k": 30, "lambda_mult": 0.5}
-        )
-        all_docs = retriever.invoke(question)
-    
-    return all_docs
+        return results
+    except Exception as e:
+        print(f"Error in retrieve_from_all_documents: {e}")
+        return []
 
 
 # ── Model Registry ───────────────────────────────────────────────
@@ -319,12 +279,15 @@ def get_rag_answer(
     question: str,
     evaluate: bool = True,
     model_name: Optional[str] = None,
-    model_params: Optional[ModelParams] = None
+    model_params: Optional[ModelParams] = None,
+    user_id: Optional[int] = None,
+    session_id: Optional[str] = None
 ) -> dict:
     """
     Retrieve relevant chunks from FAISS and send to LLM with prompt.
     Uses per-document retrieval for "all documents" queries to ensure all documents are included.
     Uses MMR (Maximal Marginal Relevance) for single-topic queries.
+    Includes conversation history for context-aware responses.
     
     Args:
         question: The question to ask
@@ -333,35 +296,28 @@ def get_rag_answer(
                    Examples: "groq:llama-3.1-8b-instant", "openai:gpt-4o-mini",
                    "huggingface:meta-llama/Llama-3.1-8B-Instruct", "ollama:llama3"
         model_params: Optional ModelParams for tuning generation
+        user_id: User ID for conversation history (optional)
+        session_id: Session ID for conversation history (optional)
     
     Returns:
         Dictionary with question, answer, sources, and evaluation
     """
-    vectorstore = get_vectorstore()
-    if not vectorstore:
-        raise ValueError("Vector store is empty. Please ingest PDFs first.")
-
-    # Detect if user is asking for all documents
-    is_all_docs = is_all_documents_query(question)
+    history_context = ""
+    if user_id:
+        try:
+            history_service = get_history_service()
+            history_context = history_service.get_conversation_context(
+                user_id=user_id,
+                session_id=session_id,
+                max_history=5
+            )
+        except Exception as e:
+            print(f"Warning: Could not retrieve conversation history: {e}")
     
-    # Retrieve documents based on query type
-    if is_all_docs:
-        # All documents query: ensure chunks from EACH document
-        docs = retrieve_from_all_documents(vectorstore, question)
-    else:
-        # Single query: use standard MMR retrieval
-        retriever = vectorstore.as_retriever(
-            search_type="mmr",
-            search_kwargs={
-                "k": 8,         # Return 8 chunks
-                "fetch_k": 16,  # Consider 16 candidates
-                "lambda_mult": 0.7  # 70% relevance, 30% diversity
-            }
-        )
-        docs = retriever.invoke(question)
-
-    # Format context from retrieved documents
-    context = format_docs(docs)
+    # Combine document context with history context
+    full_context = document_context
+    if history_context:
+        full_context = f"{history_context}\n\nDocument context:\n{document_context}"
     
     # Get LLM and create chain
     llm = get_llm(model_name, model_params)
@@ -372,7 +328,7 @@ def get_rag_answer(
         | StrOutputParser()
     )
 
-    answer = chain.invoke({"context": context, "question": question})
+    answer = chain.invoke({"context": full_context, "question": question})
     
     # Fetch sources for response
     sources = list({doc.metadata.get("source", "unknown") for doc in docs})
@@ -383,13 +339,28 @@ def get_rag_answer(
         "sources":  sources,
         "evaluation": None,
     }
+    
+    # Save conversation to history if user_id is provided
+    if user_id:
+        try:
+            history_service = get_history_service()
+            history_service.add_conversation(
+                user_id=user_id,
+                question=question,
+                answer=answer,
+                sources=sources,
+                session_id=session_id
+            )
+        except Exception as e:
+            print(f"Warning: Could not save conversation to history: {e}")
 
     # ── Step 2: Evaluator LLM (judge) ────────────────────────────
     if evaluate:
         eval_result = evaluate_response(
             question=question,
-            reference=context,   # retrieved chunks as ground truth
+            reference=document_context,   # retrieved chunks as ground truth
             answer=answer,
+            history_context=history_context,  # pass conversation history to evaluator
         )
         result["evaluation"] = {
             "verdict":    eval_result["verdict"],
@@ -403,7 +374,9 @@ async def get_rag_answer_stream(
     question: str,
     evaluate: bool = True,
     model_name: Optional[str] = None,
-    model_params: Optional[ModelParams] = None
+    model_params: Optional[ModelParams] = None,
+    user_id: Optional[int] = None,
+    session_id: Optional[str] = None
 ):
     """
     Async generator that streams RAG answer chunks in real-time.
@@ -433,22 +406,35 @@ async def get_rag_answer_stream(
         if is_all_docs:
             docs = retrieve_from_all_documents(vectorstore, question)
         else:
-            retriever = vectorstore.as_retriever(
-                search_type="mmr",
-                search_kwargs={
-                    "k": 8,
-                    "fetch_k": 16,
-                    "lambda_mult": 0.7
-                }
+            docs = vectorstore.similarity_search(
+                query=question,
+                k=8
             )
-            docs = retriever.invoke(question)
 
         # Yield sources
         sources = list({doc.metadata.get("source", "unknown") for doc in docs})
         yield {"type": "sources", "sources": sources}
 
         # Format context from retrieved documents
-        context = format_docs(docs)
+        document_context = format_docs(docs)
+        
+        # Get conversation history if user_id is provided
+        history_context = ""
+        if user_id:
+            try:
+                history_service = get_history_service()
+                history_context = history_service.get_conversation_context(
+                    user_id=user_id,
+                    session_id=session_id,
+                    max_history=5
+                )
+            except Exception as e:
+                print(f"Warning: Could not retrieve conversation history: {e}")
+        
+        # Combine document context with history context
+        full_context = document_context
+        if history_context:
+            full_context = f"{history_context}\n\nDocument context:\n{document_context}"
         
         # Get LLM and create chain
         llm = get_llm(model_name, model_params)
@@ -467,20 +453,35 @@ async def get_rag_answer_stream(
         answer_chunks = []
         
         # LangChain supports streaming via .stream()
-        for chunk in chain.stream({"context": context, "question": question}):
+        for chunk in chain.stream({"context": full_context, "question": question}):
             yield {"type": "chunk", "content": chunk}
             answer_chunks.append(chunk)
 
         # Combine all chunks to get the full answer for evaluation
         full_answer = "".join(answer_chunks)
+        
+        # Save conversation to history if user_id is provided
+        if user_id:
+            try:
+                history_service = get_history_service()
+                history_service.add_conversation(
+                    user_id=user_id,
+                    question=question,
+                    answer=full_answer,
+                    sources=sources,
+                    session_id=session_id
+                )
+            except Exception as e:
+                print(f"Warning: Could not save conversation to history: {e}")
 
         # Evaluate if requested
         if evaluate:
             yield {"type": "message", "message": "Evaluating response..."}
             eval_result = evaluate_response(
                 question=question,
-                reference=context,
+                reference=document_context,
                 answer=full_answer,
+                history_context=history_context,  # pass conversation history to evaluator
             )
             yield {
                 "type": "evaluation",

@@ -3,7 +3,7 @@ import Modal from './Modal';
 import { api } from '../services/api';
 import './Admin.css';
 
-const Admin = ({ user, onClose }) => {
+const Admin = ({ user, onClose, onReset }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -23,8 +23,29 @@ const Admin = ({ user, onClose }) => {
     try {
       const response = await api.resetVectorStore();
       setMessage(response.message);
+      if (onReset) {
+        onReset();
+      }
     } catch (error) {
       setMessage('Failed to reset vector store.');
+    }
+    setIsLoading(false);
+  };
+
+  const handleDeletePineconeIndex = async () => {
+    setIsLoading(true);
+    try {
+      const response = await api.deletePineconeIndex();
+      if (response.index_name) {
+        setMessage(`Pinecone index '${response.index_name}' deleted successfully.`);
+      } else {
+        setMessage(response.message);
+      }
+      if (onReset) {
+        onReset();
+      }
+    } catch (error) {
+      setMessage('Failed to delete Pinecone index.');
     }
     setIsLoading(false);
   };
@@ -41,6 +62,9 @@ const Admin = ({ user, onClose }) => {
         </button>
         <button onClick={handleResetVectorStore} disabled={isLoading}>
           {isLoading ? 'Resetting...' : 'Reset Vector Store'}
+        </button>
+        <button onClick={handleDeletePineconeIndex} disabled={isLoading}>
+          {isLoading ? 'Deleting...' : 'Delete Pinecone Index'}
         </button>
       </div>
       {message && <p className="admin-message">{message}</p>}

@@ -1,0 +1,103 @@
+graph TB
+    subgraph Frontend["🎨 React Frontend (rag-ui)"]
+        App["App.jsx<br/>Main Component"]
+        UI["UI Components"]
+        Auth["AuthSidebar<br/>UserDetails"]
+        Chat["ChatMessage<br/>TypingIndicator"]
+        Upload["DropZone<br/>FileCard<br/>DocumentList"]
+        Modal["DocumentModal"]
+        
+        Hooks["Custom Hooks"]
+        useAuth["useAuth"]
+        useChat["useChat"]
+        useHealth["useHealth"]
+        useUpload["useUpload"]
+        
+        API["API Service<br/>services/api.js"]
+        
+        UI -.-> Auth
+        UI -.-> Chat
+        UI -.-> Upload
+        UI -.-> Modal
+        App --> UI
+        App --> Hooks
+        Hooks --> useAuth
+        Hooks --> useChat
+        Hooks --> useHealth
+        Hooks --> useUpload
+        UI --> API
+    end
+    
+    subgraph Backend["⚙️ FastAPI Backend (rag-pdf-service)"]
+        Main["main.py<br/>FastAPI App"]
+        
+        subgraph Routers["📡 Routers"]
+            AuthR["auth.py<br/>Authentication"]
+            IngestR["ingest_router.py<br/>Document Upload"]
+            RagR["rag_router.py<br/>Ask Questions"]
+        end
+        
+        subgraph Services["🔧 Services"]
+            EmbedSvc["embedding_service.py<br/>Create Embeddings"]
+            RagSvc["rag_service.py<br/>RAG Logic & LLM"]
+            EvalSvc["eval_service.py<br/>Evaluate Responses"]
+            HistSvc["history_service.py<br/>Conversation History"]
+        end
+        
+        subgraph Database["💾 Database"]
+            ORM["SQLAlchemy ORM"]
+            Models["Models:<br/>User, Document<br/>Session, Chat<br/>BlacklistedToken"]
+            DB[(PostgreSQL/SQLite)]
+        end
+        
+        subgraph VectorStore["🧠 Vector Store"]
+            Pinecone["Pinecone Store"]
+            FAISS["FAISS Store"]
+            VectorDB[("Vector Database<br/>Pinecone Cloud")]
+        end
+        
+        Main --> Routers
+        Routers --> Services
+        AuthR --> Database
+        IngestR --> EmbedSvc
+        EmbedSvc --> VectorStore
+        RagR --> RagSvc
+        RagSvc --> VectorStore
+        RagSvc --> EvalSvc
+        RagSvc --> HistSvc
+        Database --> ORM
+        ORM --> Models
+        Models --> DB
+        Pinecone --> VectorDB
+    end
+    
+    subgraph External["☁️ External LLM Providers"]
+        Groq["Groq<br/>llama-3.3-70b"]
+        OpenAI["OpenAI<br/>GPT-4"]
+        Ollama["Ollama<br/>Local Models"]
+        HF["HuggingFace<br/>API"]
+    end
+    
+    subgraph Config["⚙️ Configuration"]
+        Env[".env<br/>Environment Variables"]
+        Models_Config["Prompts:<br/>rag_prompt.py<br/>eval_prompt.py"]
+    end
+    
+    API -->|HTTP/REST| Main
+    RagSvc -.->|LLM Calls| Groq
+    RagSvc -.->|LLM Calls| OpenAI
+    RagSvc -.->|LLM Calls| Ollama
+    RagSvc -.->|LLM Calls| HF
+    EvalSvc -.->|Judge LLM| Groq
+    
+    EmbedSvc -.->|Uses Config| Env
+    RagSvc -.->|Uses Config| Env
+    RagSvc -.->|Uses Prompts| Models_Config
+    EvalSvc -.->|Uses Prompts| Models_Config
+    
+    style Frontend fill:#61dafb
+    style Backend fill:#90c53f
+    style External fill:#ff6b6b
+    style Config fill:#ffd43b
+    style Frontend color:#000
+    style Backend color:#000
